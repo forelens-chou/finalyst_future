@@ -1,0 +1,50 @@
+# ==============================================================================
+# 中国国内期货行情数据采集系统 (fetchfu_db) - Crontab 生产定时调度示例
+# 当前服务器时区已配置为：Asia/Shanghai (北京时间 CST, UTC+8)
+# ==============================================================================
+#
+# 国内期货标准交易时间小节与 60m K线生成时点：
+# - 日盘小节：
+#   * 09:00 - 10:15（早盘第一小节，10:15 形成第一根 60m Bar）
+#   * 10:30 - 11:30（早盘第二小节，11:30 形成第二根 60m Bar）
+#   * 13:30 - 15:00（下午盘，14:30 形成第三根 Bar，15:00 全天日盘收盘与日线结清）
+# - 夜盘小节：
+#   * 21:00 - 22:00（夜盘第一小时 Bar）
+#   * 22:00 - 23:00（夜盘第二小时 Bar，大部分农产品/化工收盘）
+#   * 23:00 - 01:00（部分黑色/能源/有色延至次日 01:00 收盘）
+#   * 23:00 - 02:30（原油、沪金、沪银延至次日 02:30 收盘）
+#
+# ------------------------------------------------------------------------------
+# 模式一（推荐）：日内每小时小节完成后准实时入库（适合日内策略、监控、小时级分析）
+# ------------------------------------------------------------------------------
+# 1. 早盘各小节完成后增量拉取小时线 (10:16, 11:31)
+16 10,31 11 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+
+# 2. 下午盘 14:31 增量拉取小时线
+31 14 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+
+# 3. 日盘 15:15 最终全天收盘（同步最终小时线 + 全天日线）
+15 15 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period all >> logs/cron.log 2>&1
+
+# 4. 夜盘各时段完成后增量拉取小时线 (22:01, 23:01 周一至周五晚)
+01 22,23 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+
+# 5. 深夜/次日凌晨各时段增量拉取小时线 (00:01, 01:01, 02:35 周二至周六凌晨)
+01 00,01 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+35 02 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+
+# ------------------------------------------------------------------------------
+# 模式二：简化版交易时段每小时整点巡检（工作日逢整点过 5 分自动增量，简便易用）
+# ------------------------------------------------------------------------------
+# 每天 09-11点、13-15点、21-23点，以及次日00-02点逢 5 分钟执行一次：
+# 05 9-11,13-15,21-23 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+# 05 0-2 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+# 15 15 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 1d >> logs/cron.log 2>&1
+
+# ------------------------------------------------------------------------------
+# 模式三：中低频仅收盘批处理（最低调用频次，适合隔日/周级别策略与盘后回测）
+# ------------------------------------------------------------------------------
+# 15 15 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period all >> logs/cron.log 2>&1
+# 45 02 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m >> logs/cron.log 2>&1
+
+# ==============================================================================

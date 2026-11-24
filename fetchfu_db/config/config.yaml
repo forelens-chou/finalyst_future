@@ -1,0 +1,45 @@
+# fetchfu_db 系统配置文件
+
+# 1. 代理网络配置（境外服务器强烈建议配置，国内服务器可设为 false）
+# 提示：境外服务器访问新浪/东财等国内接口常遇跨国丢包与限速，配置国内 HTTP 或 SOCKS5 代理可彻底消除超时
+network:
+  proxy:
+    enabled: false
+    # 支持 http://、https:// 或 socks5h:// 协议（推荐 socks5h 远端解析 DNS）
+    http_url: "socks5h://127.0.0.1:10808"   # 示例：通过本地转发或国内中继节点
+    https_url: "socks5h://127.0.0.1:10808"
+  timeout_seconds: 30                       # 接口超时放宽至 30 秒（防止跨国网络长连接被截断）
+  retry_count: 3
+  retry_backoff_factor: 1.5
+
+# 2. 数据库配置
+database:
+  db_path: "data/futures_data.db"
+  wal_mode: true
+
+# 3. 抓取参数配置
+fetch:
+  history_days: 365                  # 同步近 1 年数据（可调整为 365~730 天）
+  hourly_period: "60"                # 60分钟线
+  pacing_min_seconds: 0.6            # 请求最小随机休眠秒数
+  pacing_max_seconds: 1.5            # 请求最大随机休眠秒数
+
+# 4. 品种范围配置
+symbols:
+  use_default_continuous: true       # 是否启用系统内置五大交易所主力连续合约
+  custom_symbols:                    # 自定义追加的特定合约或品种
+    - "RB0"                          # 螺纹钢连续
+    - "HC0"                          # 热卷连续
+    - "CU0"                          # 铜连续
+    - "AU0"                          # 黄金连续
+    - "SC0"                          # 原油连续
+    - "IF0"                          # 沪深300股指连续
+    - "LC0"                          # 碳酸锂连续
+  exclude_symbols: []                # 排除的品种列表
+
+# 5. 日志配置
+logging:
+  log_level: "INFO"
+  log_file: "logs/fetchfu.log"
+  max_bytes: 10485760               # 10MB
+  backup_count: 5

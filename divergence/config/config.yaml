@@ -1,0 +1,81 @@
+# divergence 策略系统主配置文件
+
+data:
+  # SQLite 数据库路径 (默认指向 fetchfu_db)
+  db_path: "../fetchfu_db/data/futures_data.db"
+  history_days_daily: 120
+  history_days_hourly: 30
+
+screener:
+  daily:
+    atr_period: 14
+    zigzag_atr_multiplier: 3.0          # 日线波段拐点 ATR 乘数
+    zone_merge_atr_multiplier: 0.5      # 相邻极值合并阈值 (ATR)
+    zone_width_atr_multiplier: 0.3      # S/R 热区上下浮动宽度 (ATR)
+    near_zone_atr_multiplier: 1.0       # 接近热区过滤阈值 (ATR)
+    min_space_to_tp1_atr_multiplier: 2.0  # 距 38.2% 回撤位的最小空间 (1H ATR)
+    donchian_periods: [20, 60]
+
+scanner:
+  hourly:
+    lookback_bars: 60                   # 小时线波峰扫描窗口
+    min_peak_distance: 5                # 双峰间最小间隔根数
+    min_trough_depth_atr_multiplier: 1.0  # 双峰间谷底最小回撤幅度 (1H ATR)
+    macd:
+      fast_period: 12
+      slow_period: 26
+      signal_period: 9
+      require_double_divergence: true   # 要求快线与红绿柱峰值双背离
+      bonus_cross_zero: true            # 双峰之间曾跨越零轴加分
+    rsi:
+      enabled: true
+      period: 14
+      overbought: 65.0
+      oversold: 35.0
+    volume:
+      enabled: true
+      window_bars: 3                    # 峰值前后均量统计窗口
+      shrink_ratio: 0.85                # 要求新峰均量 < 前峰均量 * 0.85
+    open_interest:
+      enabled: true
+      max_oi_ratio: 0.98                # 新高持仓量 <= 前高持仓量 * 0.98 (减仓推高背离)
+
+filters:
+  adx:
+    enabled: true
+    period: 14
+    threshold: 35.0                     # 日线 ADX > 35 视为强单边，拦截逆势单
+  sector_resonance:
+    enabled: true
+    warning_threshold: 0.6              # 同板块强逆向标的占比
+  market_close_buffer_minutes: 30       # 收盘前 30 分钟内标记高风险
+  limit_price_buffer_percent: 1.5       # 距离涨跌停 1.5% 拦截
+
+risk:
+  account_equity: 100000.0              # 默认基准账户本金 (元)
+  base_risk_ratio: 0.01                 # 单笔基准风险金额比例 (1.0%)
+  resonance_weights:
+    level_1: 0.50                       # 仅 MACD 双背离
+    level_2: 0.75                       # MACD + RSI 或 量能
+    level_3: 1.00                       # MACD + RSI + OI 持仓减仓满配背离
+  entry_mode: "close"                   # "close" (1H收盘确认) 或 "touch" (触价)
+  buffer_ticks: 2                       # 触发价与止损额外 Buffer (tick数)
+  stop_loss_atr_multiplier: 0.15        # 止损额外动态 ATR 保护缓冲
+  tp1_ratio: 0.382                      # 第一目标位 (38.2% 回撤)
+  tp1_close_percent: 0.60               # TP1 平仓比例 (60%)
+  tp2_ratio: 0.667                      # 第二目标位 (66.7% 回撤)
+  trailing_stop_ema_period: 20          # 剩余仓位跟踪止盈均线
+
+output:
+  report_dir: "reports"
+  enable_console_rich: true
+  enable_json_archive: true
+  enable_csv_archive: true
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    smtp_port: 465
+    use_ssl: true
+    sender: ""
+    password: ""
+    recipients: []

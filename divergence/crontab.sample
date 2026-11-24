@@ -1,0 +1,51 @@
+# ==============================================================================
+# Finalyst 量化系统 - fetchfu_db 与 divergence 联合生产调度 Crontab 配置示例
+# 当前服务器系统时区已配置为：Asia/Shanghai (北京时间 CST, UTC+8)
+# ==============================================================================
+#
+# 【核心机制说明】：
+# 国内期货各交易时段一结束，fetchfu_db 先拉取最新增量存入 SQLite (WAL 模式)，
+# 写入完成后立即由 divergence 消费 SQLite 最新数据，计算背离微结构并更新 latest_hourly_signals.csv。
+#
+# ------------------------------------------------------------------------------
+# 方案 A（强烈推荐）：基于 run_pipeline.sh 流水线脚本，调度最简洁、日志集中
+# ------------------------------------------------------------------------------
+#
+# 1. 早盘各小节完成后：增量入库 -> 小时背离扫描出单 (10:16, 11:31 执行)
+16 10 * * 1-5 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+31 11 * * 1-5 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+
+# 2. 下午盘第一小时完成后：增量入库 -> 小时背离扫描出单 (14:31 执行)
+31 14 * * 1-5 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+
+# 3. 日盘 15:15 全天总收盘：全量增量 -> 日线候选池初筛 -> 小时背离出单 (15:15 执行)
+15 15 * * 1-5 /home/elvelyn/myapp/finalyst/run_pipeline.sh daily
+
+# 4. 夜盘前半段各时段完成后：增量入库 -> 小时背离扫描出单 (22:01, 23:01 周一至周五晚执行)
+01 22,23 * * 1-5 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+
+# 5. 深夜及凌晨各时段完成后：增量入库 -> 小时背离扫描出单 (00:01, 01:01, 02:35 周二至周六凌晨执行)
+01 00,01 * * 2-6 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+35 02 * * 2-6 /home/elvelyn/myapp/finalyst/run_pipeline.sh hourly
+
+
+# ------------------------------------------------------------------------------
+# 方案 B：直接在 Crontab 中行内级联执行（无需外部 Shell 脚本，强原子联动 &&）
+# ------------------------------------------------------------------------------
+#
+# 1. 早盘 (10:16, 11:31)
+16 10 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+31 11 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+
+# 2. 下午盘 (14:31)
+31 14 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+
+# 3. 日盘收盘归档 (15:15)
+15 15 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period all && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --daily && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+
+# 4. 夜盘前半段 (22:01, 23:01)
+01 22,23 * * 1-5 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+
+# 5. 深夜及凌晨 (00:01, 01:01, 02:35)
+01 00,01 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
+35 02 * * 2-6 cd /home/elvelyn/myapp/finalyst/fetchfu_db && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --incremental --period 60m && cd /home/elvelyn/myapp/finalyst/divergence && /home/elvelyn/myapp/finalyst/.venv/bin/python main.py --hourly >> /home/elvelyn/myapp/finalyst/logs/cron.log 2>&1
